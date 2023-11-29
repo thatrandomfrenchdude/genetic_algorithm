@@ -9,37 +9,45 @@ from torch.optim.lr_scheduler import StepLR
 
 from mnist import MnistNet, train, test
 
+# references
+# https://github.com/pytorch/examples/blob/main/mnist/main.py
+
 def mnist_main():
-    # Training settings
-    parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
-    parser.add_argument('--batch-size', type=int, default=64, metavar='N',
-                        help='input batch size for training (default: 64)')
-    parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
-                        help='input batch size for testing (default: 1000)')
-    parser.add_argument('--epochs', type=int, default=14, metavar='N',
-                        help='number of epochs to train (default: 14)')
-    parser.add_argument('--lr', type=float, default=1.0, metavar='LR',
-                        help='learning rate (default: 1.0)')
-    parser.add_argument('--gamma', type=float, default=0.7, metavar='M',
-                        help='Learning rate step gamma (default: 0.7)')
-    parser.add_argument('--no-cuda', action='store_true', default=False,
-                        help='disables CUDA training')
-    parser.add_argument('--no-mps', action='store_true', default=False,
-                        help='disables macOS GPU training')
-    parser.add_argument('--dry-run', action='store_true', default=False,
-                        help='quickly check a single pass')
-    parser.add_argument('--seed', type=int, default=1, metavar='S',
-                        help='random seed (default: 1)')
-    parser.add_argument('--log-interval', type=int, default=10, metavar='N',
-                        help='how many batches to wait before logging training status')
-    parser.add_argument('--save-model', action='store_true', default=False,
-                        help='For Saving the current Model')
-    args = parser.parse_args()
-    use_cuda = not args.no_cuda and torch.cuda.is_available()
-    use_mps = not args.no_mps and torch.backends.mps.is_available()
+    # training settings
+    train_batch_size = 64  # input batch size for training (default: 64)
+    test_batch_size = 1000  # input batch size for testing (default: 1000)
+    epochs = 14  # number of epochs to train (default: 14)
+    learning_rate = 1.0  # learning rate (default: 1.0)
+    gamma = 0.7  # Learning rate step gamma (default: 0.7)
+    use_cuda = False  # enables CUDA training
+    use_mps = False  # enables macOS GPU
+    dry_run = False  # quickly check a single pass
+    seed = 1  # random seed (default: 1)
+    log_interval = 10  # how many batches to wait before logging training status
+    save_model = False  # For Saving the current Model
 
-    torch.manual_seed(args.seed)
+    train_args = {
+        'batch_size': train_batch_size,
+        'test_batch_size': test_batch_size,
+        'epochs': epochs,
+        'lr': learning_rate,
+        'gamma': gamma,
+        'use_cuda': use_cuda,
+        'use_mps': use_mps,
+        'dry_run': dry_run,
+        'seed': seed,
+        'log_interval': log_interval,
+        'save_model': save_model
+    }
 
+    # configure gpus
+    use_cuda = use_cuda if use_cuda and torch.cuda.is_available() else False
+    use_mps = use_mps if use_mps and torch.backends.mps.is_available() else False
+
+    # set the seed
+    torch.manual_seed(seed)
+
+    # setup the device
     if use_cuda:
         device = torch.device("cuda")
     elif use_mps:
@@ -47,8 +55,8 @@ def mnist_main():
     else:
         device = torch.device("cpu")
 
-    train_kwargs = {'batch_size': args.batch_size}
-    test_kwargs = {'batch_size': args.test_batch_size}
+    train_kwargs = {'batch_size': train_batch_size}
+    test_kwargs = {'batch_size': test_batch_size}
     if use_cuda:
         cuda_kwargs = {'num_workers': 1,
                        'pin_memory': True,
@@ -68,18 +76,19 @@ def mnist_main():
     test_loader = torch.utils.data.DataLoader(dataset2, **test_kwargs)
 
     model = MnistNet().to(device)
-    optimizer = optim.Adadelta(model.parameters(), lr=args.lr)
+    optimizer = optim.Adadelta(model.parameters(), lr=learning_rate)
 
-    scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
-    for epoch in range(1, args.epochs + 1):
-        train(args, model, device, train_loader, optimizer, epoch)
+    scheduler = StepLR(optimizer, step_size=1, gamma=gamma)
+    for epoch in range(1, epochs + 1):
+        train(train_args, model, device, train_loader, optimizer, epoch)
         test(model, device, test_loader)
         scheduler.step()
 
-    if args.save_model:
+    if save_model:
         torch.save(model.state_dict(), "mnist_cnn.pt")
 
 def init_networks(population):
+    # use parallel processing to initialize and train the first generation
     return [NetworkParams() for _ in range(population)]
 
 class NetworkParams():
